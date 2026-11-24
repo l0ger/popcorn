@@ -2,7 +2,7 @@
   "name": "popcorn",
   "description": "popcorn: deterministic, YAML-defined development workflows for Claude Code.",
   "owner": {
-    "name": "popcorn maintainers"
+    "name": "Mehdi Geranmalek"
   },
   "plugins": [
     {
