@@ -1,0 +1,5 @@
+node_modules/
+coverage/
+.popcorn/runs/
+*.log
+.DS_Store
