@@ -212,6 +212,8 @@ A new adapter implements `parse`, `render`, `renderCrash` and `agentRef`, is reg
 
 ## Development
 
+Architecture, diagrams and contributor notes are in [docs/](docs/README.md).
+
 ```bash
 npm install
 npm run check      # typecheck, build the bundle, run unit and end-to-end tests
