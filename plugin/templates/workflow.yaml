@@ -1,0 +1,116 @@
+# popcorn workflow: Plan → Design → Build → Test → Review → Deploy
+#
+# popcorn enforces this file with hooks. The agent can't skip a phase, can't finish a phase
+# before its artifacts, agent outputs and gates are in place, can't edit outside a phase's
+# paths, and can't run guarded commands (push, merge) until you approve.
+#
+# Edit it freely: add, remove or reorder phases, change gates and agents. Then run `popcorn validate`.
+# {task} is the run's name, e.g. p1-user-login.
+version: 1
+name: agile-6-phase
+description: User story → technical design → test-first build → hardening and gates → three-reviewer review → approved deploy.
+
+policy:
+  # Never allowed, in any phase.
+  deny_shell:
+    - "git push --force*"
+    - "git push -f*"
+    - "git reset --hard*"
+    - "git clean -fd*"
+    - "rm -rf /*"
+  # Allowed only in a phase that lists them in allow.guarded, after you approve that phase.
+  guarded_shell:
+    - "git push*"
+    - "git merge*"
+  # How often the agent may try to finish an incomplete phase before the run waits for you.
+  max_attempts_per_phase: 3
+  # Review findings with these severities send the run back to the phase's on_fail.
+  blocking_severities: [BLOCKER, CRITICAL, HIGH]
+  gate_timeout_seconds: 900
+
+phases:
+  - id: plan
+    title: Plan
+    agent: product-manager
+    goal: Turn the request into a user story with acceptance criteria.
+    instructions: |
+      Write docs/plans/{task}.md with a "## Story" section: the user story ("As a <role>, I want
+      <capability>, so that <benefit>"), acceptance criteria as observable behaviour
+      (Given/When/Then), out of scope, dependencies and open questions for the user.
+    artifacts: ["docs/plans/{task}.md"]
+    allow:
+      edit: ["docs/**"]
+
+  - id: design
+    title: Design
+    agent: architect
+    goal: Decide how to build it, and get the plan approved.
+    instructions: |
+      Add a "## Design" section to docs/plans/{task}.md: the approach, invariants mapped to tests,
+      ordered build steps (each with one command that proves it), the files or directories it will
+      touch, and risks. Then summarise the plan for the user.
+    artifacts: ["docs/plans/{task}.md"]
+    approval: after
+    allow:
+      edit: ["docs/**"]
+
+  - id: build
+    title: Build
+    agent: implementer
+    goal: Implement the design test-first, one build step per commit.
+    instructions: |
+      Follow the build steps in docs/plans/{task}.md. For each step, write a failing test first,
+      then the code that makes it pass, then commit the step.
+    gates:
+      - "npm test" # replace with your project's test command
+
+  - id: test
+    title: Test
+    agent: test-engineer
+    goal: Harden the tests and pass the full quality gate.
+    instructions: |
+      Add edge-case and error-path tests for the change. Check that each new test fails when the
+      line it covers is broken, then restore it. Commit the tests.
+    gates:
+      - "npm test" # e.g. "npm run lint && npm run typecheck && npm test"
+
+  - id: review
+    title: Review
+    goal: Get the change reviewed for correctness, quality and security.
+    instructions: |
+      Run the three reviewers in parallel on `git diff main...HEAD`. Each one writes its result
+      file. If they find blocking issues, popcorn sends the run back to Build with the findings.
+    outputs:
+      schema: review
+      required: [code-reviewer, quality-reviewer, security-reviewer]
+    on_fail: build
+    allow:
+      edit: [".popcorn/outputs/**"]
+
+  - id: deploy
+    title: Deploy
+    goal: Merge the branch into main and push it.
+    instructions: |
+      Merge the branch into main with --no-ff, run the test command on main, and push main only if
+      it passes. Report what was shipped.
+    approval: before
+    allow:
+      guarded: ["git push*", "git merge*"]
+
+schemas:
+  review:
+    type: object
+    required: [verdict, findings]
+    properties:
+      verdict: { enum: [approve, changes_requested] }
+      findings:
+        type: array
+        items:
+          type: object
+          required: [severity, title]
+          properties:
+            severity: { enum: [BLOCKER, CRITICAL, HIGH, MEDIUM, LOW] }
+            title: { type: string }
+            file: { type: string }
+            line: { type: integer }
+            fix: { type: string }

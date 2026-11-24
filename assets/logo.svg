@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>popcorn</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#312E81"/><stop offset="1" stop-color="#1E1B4B"/>
+    </linearGradient>
+    <radialGradient id="kernel" cx="0.4" cy="0.35" r="0.75">
+      <stop offset="0" stop-color="#FFFBEB"/><stop offset="0.7" stop-color="#FFEDB3"/><stop offset="1" stop-color="#F9D776"/>
+    </radialGradient>
+    <clipPath id="bucket"><path d="M232 500 L792 500 L712 880 Q700 920 660 920 L364 920 Q324 920 312 880 Z"/></clipPath>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+  <circle cx="330" cy="440" r="92" fill="url(#kernel)" stroke="#E9B949" stroke-width="10"/>
+<circle cx="700" cy="440" r="92" fill="url(#kernel)" stroke="#E9B949" stroke-width="10"/>
+<circle cx="400" cy="330" r="88" fill="url(#kernel)" stroke="#E9B949" stroke-width="10"/>
+<circle cx="624" cy="330" r="88" fill="url(#kernel)" stroke="#E9B949" stroke-width="10"/>
+<circle cx="512" cy="270" r="100" fill="url(#kernel)" stroke="#E9B949" stroke-width="10"/>
+<circle cx="450" cy="420" r="104" fill="url(#kernel)" stroke="#E9B949" stroke-width="10"/>
+<circle cx="574" cy="420" r="104" fill="url(#kernel)" stroke="#E9B949" stroke-width="10"/>
+<circle cx="512" cy="470" r="96" fill="url(#kernel)" stroke="#E9B949" stroke-width="10"/>
+  <ellipse cx="297.8" cy="403.2" rx="25.76" ry="16.56" fill="#FFFFFF" opacity="0.7"/>
+<ellipse cx="667.8" cy="403.2" rx="25.76" ry="16.56" fill="#FFFFFF" opacity="0.7"/>
+<ellipse cx="369.2" cy="294.8" rx="24.64" ry="15.84" fill="#FFFFFF" opacity="0.7"/>
+<ellipse cx="593.2" cy="294.8" rx="24.64" ry="15.84" fill="#FFFFFF" opacity="0.7"/>
+<ellipse cx="477.0" cy="230.0" rx="28.000000000000004" ry="18.0" fill="#FFFFFF" opacity="0.7"/>
+<ellipse cx="413.6" cy="378.4" rx="29.120000000000005" ry="18.72" fill="#FFFFFF" opacity="0.7"/>
+<ellipse cx="537.6" cy="378.4" rx="29.120000000000005" ry="18.72" fill="#FFFFFF" opacity="0.7"/>
+<ellipse cx="478.4" cy="431.6" rx="26.880000000000003" ry="17.28" fill="#FFFFFF" opacity="0.7"/>
+  <g clip-path="url(#bucket)">
+    <rect x="200" y="480" width="640" height="460" fill="#E63946"/>
+    <path d="M232 500 L344 500 L399.6 940 L324.6 940 Z" fill="#E63946"/><path d="M344 500 L456 500 L474.5 940 L399.6 940 Z" fill="#FFF4E0"/><path d="M456 500 L568 500 L549.5 940 L474.5 940 Z" fill="#E63946"/><path d="M568 500 L680 500 L624.4 940 L549.5 940 Z" fill="#FFF4E0"/><path d="M680 500 L792 500 L699.4 940 L624.4 940 Z" fill="#E63946"/>
+    <rect x="200" y="860" width="640" height="80" fill="#000" opacity="0.12"/>
+  </g>
+  <rect x="208" y="472" width="608" height="64" rx="32" fill="#C1121F"/>
+  <rect x="208" y="472" width="608" height="22" rx="11" fill="#FFFFFF" opacity="0.18"/>
+  <circle cx="792" cy="812" r="132" fill="#2A9D8F" stroke="#1E1B4B" stroke-width="28"/>
+  <path d="M730 814 L775 860 L860 768" fill="none" stroke="#FFFFFF" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
