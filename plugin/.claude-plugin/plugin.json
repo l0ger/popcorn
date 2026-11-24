@@ -2,6 +2,9 @@
   "name": "popcorn",
   "version": "0.1.0",
   "description": "Deterministic, YAML-defined development workflows for Claude Code: enforced phases, quality gates, human approvals and guardrails, with ready-made agents you can override.",
+  "author": {
+    "name": "Mehdi Geranmalek"
+  },
   "keywords": [
     "workflow",
     "sdlc",
