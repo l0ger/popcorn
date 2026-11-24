@@ -1,0 +1,35 @@
+{
+  "name": "popcorn-workflows",
+  "version": "0.1.0",
+  "description": "Deterministic, YAML-defined AI development workflows for coding agents: enforced phases, gates and human approvals. Claude Code today, GitHub Copilot on the roadmap.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "esbuild src/cli/main.ts --bundle --platform=node --target=node20 --format=esm --minify --outfile=plugin/dist/popcorn.mjs --metafile=plugin/dist/meta.json --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" && node scripts/third-party-notices.mjs && rm plugin/dist/meta.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "npm run build && vitest run tests/e2e",
+    "check": "npm run typecheck && npm run build && vitest run"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "picomatch": "^4.0.2",
+    "yaml": "^2.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/picomatch": "^3.0.1",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "keywords": [
+    "coding-agents",
+    "copilot",
+    "github-copilot"
+  ]
+}

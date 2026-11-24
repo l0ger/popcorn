@@ -1,0 +1,18 @@
+{
+  "name": "popcorn",
+  "version": "0.1.0",
+  "description": "Deterministic, YAML-defined development workflows for Claude Code: enforced phases, quality gates, human approvals and guardrails, with ready-made agents you can override.",
+  "keywords": [
+    "workflow",
+    "sdlc",
+    "agents",
+    "hooks",
+    "guardrails",
+    "quality-gates",
+    "human-in-the-loop",
+    "yaml",
+    "tdd",
+    "code-review"
+  ],
+  "license": "MIT"
+}

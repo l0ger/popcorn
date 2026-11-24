@@ -1,0 +1,14 @@
+{
+  "name": "popcorn",
+  "description": "popcorn: deterministic, YAML-defined development workflows for Claude Code.",
+  "owner": {
+    "name": "popcorn maintainers"
+  },
+  "plugins": [
+    {
+      "name": "popcorn",
+      "source": "./plugin",
+      "description": "Deterministic, YAML-defined development workflows for Claude Code: enforced phases, gates, approvals and guardrails."
+    }
+  ]
+}
