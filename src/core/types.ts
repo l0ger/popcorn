@@ -13,7 +13,10 @@ export interface PhaseAllow {
   shell?: string[];
   /** MCP servers whose tools may be used in this phase. Default: all. */
   mcp?: string[];
-  /** Guarded commands (policy.guarded_shell) this phase unlocks, once its approval is granted. */
+  /**
+   * Guarded patterns (from policy.guarded_shell or policy.guarded_mcp) this phase unlocks: after its
+   * `before` approval, and/or once the phase named by `unlock_after` has passed (see Phase.unlock_after).
+   */
   guarded?: string[];
 }
 
@@ -45,6 +48,12 @@ export interface Phase {
   approval?: Approval;
   allow?: PhaseAllow;
   deny?: PhaseDeny;
+  /**
+   * An earlier phase that must have passed, in its current round, before this phase's allow.guarded
+   * patterns unlock. When that phase has outputs, every output must also carry `verdict: "approve"`.
+   * Lets the reviewer agents' approval, instead of the user's, unlock a push or a merge.
+   */
+  unlock_after?: string;
   /** Phase to return to when an output carries a blocking finding. */
   on_fail?: string;
   /** Next phase. Default: the next one in the list. */
@@ -56,12 +65,20 @@ export interface Policy {
   deny_shell?: string[];
   /** Shell patterns allowed only in a phase that lists them in allow.guarded, after its approval. */
   guarded_shell?: string[];
+  /**
+   * MCP tools allowed only in a phase that lists them in allow.guarded, once it is unlocked. Patterns
+   * are "<server>:<tool>" with `*` as a wildcard, e.g. "*:merge_pull_request" (server names are
+   * whatever the project's MCP config calls them).
+   */
+  guarded_mcp?: string[];
   /** Paths the agent may never edit (in addition to popcorn's own state). */
   protect_paths?: string[];
   /** How many times the agent may try to stop before a phase is complete. Then the run escalates. */
   max_attempts_per_phase?: number;
   /** Finding severities that send a phase back to its on_fail phase. */
   blocking_severities?: string[];
+  /** Output `verdict` values that send a phase back to its on_fail phase, e.g. [changes_requested]. */
+  blocking_verdicts?: string[];
   /** Timeout for each gate command, in seconds. */
   gate_timeout_seconds?: number;
 }
@@ -93,6 +110,8 @@ export interface RunState {
   attempts: Record<string, number>;
   /** Approvals, keyed "<phase>#<round>#<before|after>". */
   approvals: Record<string, string>;
+  /** Phases that passed with every output approving: phase id → the round they passed in. */
+  passed?: Record<string, number>;
   /** Feedback the human gave with a rejection, shown once. */
   feedback?: string;
   /** Last gate results by "<phase>#<command>". */

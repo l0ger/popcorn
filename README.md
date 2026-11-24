@@ -2,7 +2,7 @@
 
 # popcorn: deterministic AI development workflows for coding agents
 
-**popcorn makes your AI coding agent follow your team's development workflow: every phase, every quality gate, every human approval, in order.** You describe the workflow once in a YAML file (for example Plan → Design → Build → Test → Review → Deploy), and popcorn enforces it through the agent's own hooks. It runs as a **Claude Code plugin** today, and **GitHub Copilot** support is on the roadmap: one workflow file, whichever agent your team uses. The agent can't skip the tests, can't merge without a code review, can't push to `main` before you approve, and can't quietly edit its own rules. It ships with ready-made agents (product manager, architect, implementer, test engineer, and code, quality and security reviewers) that you can override one by one, and it uses your project's normal MCP servers.
+**popcorn makes your AI coding agent follow your team's development workflow: every phase, every quality gate, every human approval, in order.** You describe the workflow once in a YAML file (for example Plan → Design → Build → Test → Publish → Review → Deploy), and popcorn enforces it through the agent's own hooks. It runs as a **Claude Code plugin** today, and **GitHub Copilot** support is on the roadmap: one workflow file, whichever agent your team uses. The agent can't skip the tests, can't merge without a code review, can't push to `main` before you approve, and can't quietly edit its own rules. It ships with ready-made agents (product manager, architect, implementer, test engineer, and code, quality and security reviewers) that you can override one by one, and it uses your project's normal MCP servers.
 
 Spec-driven development, TDD and multi-agent code review, as a workflow you can't accidentally skip.
 
@@ -24,9 +24,10 @@ AI coding agents are fast, and they cut corners when you're not watching. They "
 
 - **YAML-defined workflows.** Phases, agents, artifacts, gate commands, approvals, allowed paths, commands and MCP servers. Change the YAML and the workflow changes. No code.
 - **Enforced phase order.** The agent works on one phase at a time and can't move on until that phase is done.
-- **Quality gates.** Any shell command (`npm test`, `pytest`, `make lint`, `cargo clippy`) must pass before a phase is complete. Results are cached per working-tree state, so an unchanged tree doesn't rerun the suite.
+- **Quality gates.** Any shell command (`npm test`, `pytest`, `make lint`, `cargo clippy`) must pass before a phase is complete. Passing results are cached per working-tree state, so an unchanged tree doesn't rerun a suite that passed. Failures are always rerun, since a gate can depend on more than the tree (for example what was pushed).
 - **Human-in-the-loop approvals.** `approval: before` or `approval: after` on any phase. Only **you** can approve, by typing `popcorn approve` as a prompt. The agent has no command that approves.
-- **Guardrails.** Commands that are always denied, guarded commands (push, merge) that unlock only after approval, per-phase editable paths, and per-phase MCP allowlists. popcorn's own state is out of the agent's reach.
+- **Guardrails.** Commands that are always denied, guarded commands and MCP tools (push, merge) that unlock only after your approval or once the reviewer agents approve, per-phase editable paths, and per-phase MCP allowlists. popcorn's own state is out of the agent's reach.
+- **Visible on GitHub.** The starter workflow pushes the branch and opens a pull request, posts each reviewer's findings on it as a review, and merges it once every reviewer agent approves (see [GitHub pull requests](#github-pull-requests)).
 - **Structured multi-agent review.** Reviewer agents write JSON verdicts validated against a JSON Schema in your workflow. Blocking severities loop the run back to Build, with the findings.
 - **Ready-made agents, overridable.** Seven agents ship with the plugin. Put a `.claude/agents/code-reviewer.md` in your project and popcorn uses yours instead.
 - **Your MCP servers.** popcorn reads nothing special: it uses your project's `.mcp.json`. Phases can restrict which servers are allowed.
@@ -85,9 +86,11 @@ version: 1
 name: my-team
 policy:
   deny_shell: ["git push --force*", "git reset --hard*"]   # never allowed
-  guarded_shell: ["git push*", "git merge*"]               # only after approval, in a phase that unlocks them
+  guarded_shell: ["git push*", "git merge*"]               # only in a phase that unlocks them
+  guarded_mcp: ["*:merge_pull_request"]                    # MCP tools, as "<server>:<tool>"
   max_attempts_per_phase: 3
   blocking_severities: [BLOCKER, CRITICAL, HIGH]
+  blocking_verdicts: [changes_requested]                   # a reviewer that doesn't approve sends the run back
 phases:
   - id: plan
     agent: product-manager
@@ -123,10 +126,47 @@ schemas:
 | `allow.edit` / `deny.edit` | Globs of editable paths in this phase |
 | `allow.shell` / `deny.shell` | Shell command patterns for this phase |
 | `allow.mcp` | MCP servers this phase may use |
-| `allow.guarded` | Guarded commands this phase unlocks after its `before` approval |
+| `allow.guarded` | Guarded commands (`policy.guarded_shell`) and MCP tools (`policy.guarded_mcp`) this phase unlocks after its `before` approval and/or its `unlock_after` phase's pass |
+| `unlock_after` | An earlier phase that must have passed, in its current round, before `allow.guarded` unlocks. If that phase has `outputs`, every output must say `"verdict": "approve"`: the reviewer agents' approval stands in for yours |
 | `next` | Jump to a phase other than the next one in the list |
 
 Check your file at any time with `popcorn validate`. It reports every problem, not just the first.
+
+## GitHub pull requests
+
+The starter workflow makes every change visible on GitHub:
+
+```
+Build ─ commits on popcorn/<task>
+Test ─ gates pass
+Publish ─ pushes popcorn/<task> and opens a pull request into main; done when the remote branch is at HEAD
+Review ─ three reviewer agents file JSON verdicts; each is posted on the PR as a COMMENT review
+          └─ any reviewer not approving, or a blocking finding → back to Build, then Publish again
+Deploy ─ unlocked only because every reviewer approved: merges the PR (no approval from you);
+          done when the branch is in origin/main
+```
+
+Publish refuses `git push … main`, but that check is best effort (a bare `git push` while on `main` isn't caught), so protect `main` on GitHub too.
+
+Publish, Review and Deploy use a GitHub MCP server from your project's `.mcp.json` (or the `gh` CLI if you have none). For GitHub's own server:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": { "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}" }
+    }
+  }
+}
+```
+
+Export `GITHUB_PERSONAL_ACCESS_TOKEN` before starting Claude Code, with a token that can push to the repository and write pull requests (contents, pull requests: read and write). Never commit the token. If you use `gh`, `export GITHUB_PERSONAL_ACCESS_TOKEN=$(gh auth token)` works.
+
+**Merging is guarded.** A GitHub MCP server can merge or write straight to a branch, so `policy.guarded_mcp` locks those tools (`merge_pull_request`, `push_files`, `create_or_update_file`, `delete_file`, `create_branch`, `update_pull_request_branch`) in every phase except one that unlocks them. `gh pr merge` and `gh api` are guarded too. If your server names its tools differently, add them to `guarded_mcp`.
+
+**Reviews come from your account.** The server acts with your token, so the reviewers' reviews appear under your name, and GitHub doesn't let a PR's author approve their own PR. That's why reviews are posted as comments: the JSON verdicts in `.popcorn/outputs/` are what popcorn checks. Turn on branch protection for `main` as well.
 
 ## Agents
 
@@ -146,9 +186,11 @@ Check your file at any time with `popcorn validate`. It reports every problem, n
 
 Read this before you rely on popcorn:
 
-- **What's enforced:** phase order, done-conditions, approvals, editable paths, MCP allowlists, and the protection of popcorn's own state and workflow file during a run.
+- **What's enforced:** phase order, done-conditions, approvals, editable paths, MCP allowlists, and the protection of popcorn's own state and workflow file during a run. While a run waits for your approval, edits, shell commands and MCP calls are all refused.
 - **Shell rules are best effort.** popcorn splits chained commands and looks inside `bash -c '…'`, but a determined agent can disguise a command from any pattern matcher. Keep real protections (branch protection, CI, least-privilege credentials) in place. popcorn makes the right path the easy path. It doesn't replace your repository's security.
 - **Approvals come only from your prompt.** The engine records an approval only when the user's own prompt says `popcorn approve`. No tool call can grant one.
+- **The reviewers are only as independent as their brief.** The starter workflow stops the agent from editing `.claude/agents/`, `.claude/settings*.json` and `.mcp.json` during a run, so it can't swap in a reviewer that always approves. But the main session still writes each reviewer's prompt and could steer it. If that matters to you, keep `approval: before` on Deploy.
+- **Or from the reviewers, where the workflow says so.** A phase with `unlock_after: review` unlocks its guarded commands once every reviewer filed `"verdict": "approve"`, with no prompt from you. Only the reviewer subagents can write those verdicts (see below). If you want to look before anything merges, add `approval: before` to that phase too: then both are needed.
 - **Verdicts come only from the reviewer.** A reviewer's output file can be written only by a tool call that Claude Code attributes to that subagent (`agent_type`). The main session and other agents are refused, and shell commands can't touch `.popcorn/` at all.
 - **Claude Code limits consecutive stop-hook continuations** (8 by default). Long stretches without an approval may hit it. Raise it with `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`, or add approvals to split the run.
 - **Hooks run on every tool call** while the plugin is enabled. Without `.popcorn/` in the project, popcorn exits immediately and changes nothing.

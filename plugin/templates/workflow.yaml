@@ -1,14 +1,19 @@
-# popcorn workflow: Plan → Design → Build → Test → Review → Deploy
+# popcorn workflow: Plan → Design → Build → Test → Publish → Review → Deploy
 #
 # popcorn enforces this file with hooks. The agent can't skip a phase, can't finish a phase
 # before its artifacts, agent outputs and gates are in place, can't edit outside a phase's
-# paths, and can't run guarded commands (push, merge) until you approve.
+# paths, and can't run guarded commands or MCP tools (push, merge) until they are unlocked.
+#
+# Everything is visible on GitHub: Publish pushes the branch popcorn/{task} and opens a pull
+# request, the reviewers' findings are posted on it, and Deploy merges it only once every
+# reviewer agent approves. Publish, Review and Deploy use a GitHub MCP server from your
+# project's .mcp.json (see the README), or the `gh` CLI.
 #
 # Edit it freely: add, remove or reorder phases, change gates and agents. Then run `popcorn validate`.
 # {task} is the run's name, e.g. p1-user-login.
 version: 1
-name: agile-6-phase
-description: User story → technical design → test-first build → hardening and gates → three-reviewer review → approved deploy.
+name: agile-pr
+description: User story → technical design → test-first build → hardening and gates → pull request → three-reviewer review on the PR → merge once every reviewer approves.
 
 policy:
   # Never allowed, in any phase.
@@ -18,14 +23,37 @@ policy:
     - "git reset --hard*"
     - "git clean -fd*"
     - "rm -rf /*"
+    # Best effort: the reviewer agents' definitions and the MCP config can't be changed from the shell.
+    - "*.claude/agents*"
+    - "*.claude/settings*"
+    - "*.mcp.json*"
+  # Never editable by the agent during a run. The reviewers' approval unlocks the merge, so the agent
+  # must not be able to rewrite a reviewer (agent names resolve to .claude/agents/<name>.md first).
+  protect_paths:
+    - ".claude/agents/**"
+    - ".claude/settings*.json"
+    - ".mcp.json"
   # Allowed only in a phase that lists them in allow.guarded, after you approve that phase.
   guarded_shell:
     - "git push*"
     - "git merge*"
+    - "gh pr merge*"
+    - "gh api*"
+  # MCP tools ("<server>:<tool>") allowed only in a phase that unlocks them. These cover the GitHub
+  # MCP server's tools that merge or write to a branch without a local push.
+  guarded_mcp:
+    - "*:merge_pull_request"
+    - "*:push_files"
+    - "*:create_or_update_file"
+    - "*:delete_file"
+    - "*:create_branch"
+    - "*:update_pull_request_branch"
   # How often the agent may try to finish an incomplete phase before the run waits for you.
   max_attempts_per_phase: 3
   # Review findings with these severities send the run back to the phase's on_fail.
   blocking_severities: [BLOCKER, CRITICAL, HIGH]
+  # A reviewer that doesn't approve also sends the run back: merging needs every reviewer's approval.
+  blocking_verdicts: [changes_requested]
   gate_timeout_seconds: 900
 
 phases:
@@ -59,8 +87,9 @@ phases:
     agent: implementer
     goal: Implement the design test-first, one build step per commit.
     instructions: |
-      Follow the build steps in docs/plans/{task}.md. For each step, write a failing test first,
-      then the code that makes it pass, then commit the step.
+      Work on the branch popcorn/{task} (create it from main if it doesn't exist). Follow the build
+      steps in docs/plans/{task}.md. For each step, write a failing test first, then the code that
+      makes it pass, then commit the step.
     gates:
       - "npm test" # replace with your project's test command
 
@@ -74,12 +103,38 @@ phases:
     gates:
       - "npm test" # e.g. "npm run lint && npm run typecheck && npm test"
 
+  - id: publish
+    title: Publish
+    goal: Push the branch and open a pull request, so the change is visible on GitHub.
+    instructions: |
+      Push popcorn/{task} to origin (`git push -u origin popcorn/{task}`). If it has no open pull
+      request into main yet, open one with the GitHub MCP server's create_pull_request tool (or
+      `gh pr create`): the story as the title, and a body with a summary, a link to
+      docs/plans/{task}.md and the test results. If the pull request already exists (a fix round),
+      comment on it with what changed since the last review. Never push main.
+    gates:
+      # The remote branch is at this commit, so the reviewers see what was built.
+      - 'test "$(git rev-parse HEAD)" = "$(git ls-remote origin refs/heads/popcorn/{task} | cut -f1)"'
+    unlock_after: test
+    allow:
+      edit: ["docs/**"]
+      guarded: ["git push*"]
+    deny:
+      # Best effort: a bare `git push` while on main isn't caught. Protect main on GitHub as well.
+      shell: ["git push* main", "git push* main *", "git push*:main", "git push*:main *",
+              "git push* master", "git push* master *", "git push*:master", "git push*:master *",
+              "git push*--all*", "git push*--mirror*"]
+
   - id: review
     title: Review
-    goal: Get the change reviewed for correctness, quality and security.
+    goal: Get the pull request reviewed for correctness, quality and security, on GitHub.
     instructions: |
       Run the three reviewers in parallel on `git diff main...HEAD`. Each one writes its result
-      file. If they find blocking issues, popcorn sends the run back to Build with the findings.
+      file. Once all three have, post each reviewer's result on the pull request as its own review
+      with event COMMENT (GitHub MCP pull_request_review_write, or `gh pr review --comment`): the
+      reviewer's name and verdict, then each finding with its severity, file, line and fix, as
+      inline comments where a finding has a file and line. If any reviewer doesn't approve, popcorn
+      sends the run back to Build with the findings.
     outputs:
       schema: review
       required: [code-reviewer, quality-reviewer, security-reviewer]
@@ -89,13 +144,17 @@ phases:
 
   - id: deploy
     title: Deploy
-    goal: Merge the branch into main and push it.
+    goal: Merge the pull request that every reviewer approved.
     instructions: |
-      Merge the branch into main with --no-ff, run the test command on main, and push main only if
-      it passes. Report what was shipped.
-    approval: before
+      Every reviewer approved. Merge the pull request for popcorn/{task} with the GitHub MCP
+      server's merge_pull_request tool (merge method "merge"), or `gh pr merge --merge`. Then switch
+      to main, pull, run the test command and report what was shipped, with the pull request link.
+    gates:
+      # The branch is merged into main on GitHub.
+      - "git fetch -q origin main && git merge-base --is-ancestor popcorn/{task} origin/main"
+    unlock_after: review
     allow:
-      guarded: ["git push*", "git merge*"]
+      guarded: ["*:merge_pull_request", "gh pr merge*"]
 
 schemas:
   review:

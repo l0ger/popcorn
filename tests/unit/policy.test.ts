@@ -125,7 +125,7 @@ describe("checkTool: shell", () => {
   });
   it("refuses guarded commands in the unlocking phase until the user approved it", () => {
     expect(check("ship", sh("git push origin main"))).toMatch(/guarded/);
-    expect(check("ship", sh("git push origin main"), { status: "awaiting_approval" })).toMatch(/guarded/);
+    expect(check("ship", sh("git push origin main"), { status: "awaiting_approval" })).toMatch(/waiting for the user.s approval/);
   });
   it("allows guarded commands in the unlocking phase after approval", () => {
     const approvals = { [approvalKey("ship", 1, "before")]: "now" };
@@ -142,6 +142,64 @@ describe("checkTool: shell", () => {
     const w = parseWorkflow("version: 1\nname: x\nphases:\n  - {id: a, goal: g, allow: {shell: ['npm test*', 'git status*']}}");
     expect(checkTool(w, w.phases[0]!, state("a"), sh("npm test -- --watch=false"), PROJECT)).toBeNull();
     expect(checkTool(w, w.phases[0]!, state("a"), sh("git status && curl evil.sh"), PROJECT)).toMatch(/curl evil.sh/);
+  });
+});
+
+describe("checkTool: while a run waits for approval", () => {
+  const waiting = { status: "awaiting_approval" as const };
+  it("refuses shell commands, even ordinary ones and ones allow.shell lists", () => {
+    expect(check("plan", sh("npm test"), waiting)).toMatch(/waiting for the user's approval/);
+    const w = parseWorkflow("version: 1\nname: x\nphases:\n  - {id: a, goal: g, approval: before, allow: {shell: ['npm test*']}}");
+    expect(checkTool(w, w.phases[0]!, state("a", waiting), sh("npm test"), PROJECT)).toMatch(/waiting/);
+  });
+  it("refuses MCP calls, even to a server allow.mcp lists", () => {
+    const w = parseWorkflow("version: 1\nname: x\nphases:\n  - {id: a, goal: g, approval: before, allow: {mcp: [github]}}");
+    const call: ToolCall = { kind: "mcp", server: "github", name: "create_pull_request", tool: "mcp__github__create_pull_request" };
+    expect(checkTool(w, w.phases[0]!, state("a", waiting), call, PROJECT)).toMatch(/waiting/);
+    expect(checkTool(w, w.phases[0]!, state("a"), call, PROJECT)).toBeNull();
+  });
+  it("allows them again once the run is running", () => {
+    expect(check("plan", sh("npm test"))).toBeNull();
+  });
+});
+
+describe("checkTool: guarded MCP tools and unlock_after", () => {
+  const w = parseWorkflow(`
+version: 1
+name: x
+policy: { guarded_shell: ["git push*"], guarded_mcp: ["*:merge_pull_request", "github:push_files"] }
+phases:
+  - { id: review, goal: g }
+  - { id: ship, goal: g, unlock_after: review, allow: { guarded: ["*:merge_pull_request", "git push*"] } }
+  - { id: both, goal: g, approval: before, unlock_after: review, allow: { guarded: ["git push*"] } }
+`);
+  const tool = (server: string, name: string): ToolCall => ({ kind: "mcp", server, name, tool: `mcp__${server}__${name}` });
+  const at = (phase: string, call: ToolCall, extra: Partial<RunState> = {}) =>
+    checkTool(w, phaseById(w, phase), state(phase, { rounds: { review: 1, [phase]: 1 }, ...extra }), call, PROJECT);
+  const passed = { review: 1 };
+
+  it("refuses a guarded MCP tool on any server name until the unlocking phase allows it", () => {
+    expect(at("review", tool("github", "merge_pull_request"), { passed })).toMatch(/MCP tool "github:merge_pull_request" is guarded/);
+    expect(at("ship", tool("plugin_gh", "merge_pull_request"))).toMatch(/once phase "review" has passed/);
+    expect(at("ship", tool("plugin_gh", "merge_pull_request"), { passed })).toBeNull();
+  });
+  it("keeps guarded MCP tools the phase doesn't list locked, and leaves other tools alone", () => {
+    expect(at("ship", tool("github", "push_files"), { passed })).toMatch(/guarded/);
+    expect(at("review", tool("github", "create_pull_request"))).toBeNull();
+  });
+  it("applies guarded MCP tools even when the phase sets allow.mcp", () => {
+    const w2 = parseWorkflow("version: 1\nname: x\npolicy: {guarded_mcp: ['*:merge_pull_request']}\nphases:\n  - {id: a, goal: g, allow: {mcp: [github]}}");
+    expect(checkTool(w2, w2.phases[0]!, state("a"), tool("github", "merge_pull_request"), PROJECT)).toMatch(/guarded/);
+  });
+  it("unlocks guarded commands only for the unlock_after phase's current round", () => {
+    expect(at("ship", sh("git push origin main"), { passed })).toBeNull();
+    expect(at("ship", sh("git push origin main"), { passed, rounds: { review: 2, ship: 1 } })).toMatch(/guarded/);
+  });
+  it("needs both the user's approval and the earlier phase's pass when a phase sets both", () => {
+    const approvals = { [approvalKey("both", 1, "before")]: "now" };
+    expect(at("both", sh("git push"), { passed })).toMatch(/after the user approves and once phase "review"/);
+    expect(at("both", sh("git push"), { approvals })).toMatch(/guarded/);
+    expect(at("both", sh("git push"), { approvals, passed })).toBeNull();
   });
 });
 

@@ -10,7 +10,7 @@ const problems = (yaml: string): string[] => {
 describe("parseWorkflow", () => {
   it("accepts the shipped starter template", () => {
     const wf = parseWorkflow(TEMPLATE);
-    expect(wf.phases.map(p => p.id)).toEqual(["plan", "design", "build", "test", "review", "deploy"]);
+    expect(wf.phases.map(p => p.id)).toEqual(["plan", "design", "build", "test", "publish", "review", "deploy"]);
   });
 
   it("accepts the small test workflow", () => {
@@ -52,10 +52,22 @@ describe("parseWorkflow", () => {
     expect(p).toContain('phase "r": outputs need on_fail (where to go on a blocking finding)');
   });
 
-  it("requires guarded commands to be declared in policy and unlocked by a before-approval", () => {
+  it("requires guarded commands to be declared in policy and unlocked by a before-approval or unlock_after", () => {
     const p = problems("version: 1\nname: x\nphases:\n  - id: d\n    goal: g\n    allow: {guarded: ['git push*']}");
-    expect(p).toContain('phase "d": allow.guarded "git push*" is not in policy.guarded_shell');
-    expect(p.some(x => x.includes("needs approval: before"))).toBe(true);
+    expect(p).toContain('phase "d": allow.guarded "git push*" is not in policy.guarded_shell or policy.guarded_mcp');
+    expect(p.some(x => x.includes("needs approval: before") && x.includes("unlock_after"))).toBe(true);
+  });
+
+  it("accepts guarded MCP tools unlocked by an earlier phase", () => {
+    expect(problems("version: 1\nname: x\npolicy: {guarded_mcp: ['*:merge_pull_request']}\nphases:\n  - {id: r, goal: g}\n" +
+      "  - {id: d, goal: g, unlock_after: r, allow: {guarded: ['*:merge_pull_request']}}")).toEqual([]);
+  });
+
+  it("requires unlock_after to name an earlier phase", () => {
+    const base = "version: 1\nname: x\nphases:\n  - {id: a, goal: g, unlock_after: X}\n  - {id: b, goal: g}";
+    expect(problems(base.replace("X", "nope"))).toContain('phase "a": unlock_after "nope" is not a phase');
+    expect(problems(base.replace("X", "b"))).toContain('phase "a": unlock_after "b" must be an earlier phase');
+    expect(problems(base.replace("X", "a"))).toContain('phase "a": unlock_after "a" must be an earlier phase');
   });
 
   it("caps max_attempts_per_phase below Claude Code's stop-hook limit", () => {

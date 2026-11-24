@@ -95,11 +95,28 @@ export function approvalKey(phase: string, round: number, when: "before" | "afte
   return `${phase}#${round}#${when}`;
 }
 
-/** Whether the phase's approval (the one that unlocks guarded commands) has been granted this round. */
+/**
+ * Whether the phase's guarded patterns are unlocked: its `before` approval was granted this round (when
+ * it has one), and its `unlock_after` phase passed in that phase's current round (when it names one).
+ */
 export function unlocked(phase: Phase, state: RunState): boolean {
-  const when = phase.approval ?? "none";
-  if (when === "none") return false;
-  return state.approvals[approvalKey(phase.id, state.rounds[phase.id] ?? 1, when)] !== undefined;
+  const byUser = phase.approval === "before";
+  const byPhase = phase.unlock_after;
+  if (!byUser && byPhase === undefined) return false;
+  if (byUser && state.approvals[approvalKey(phase.id, state.rounds[phase.id] ?? 1, "before")] === undefined) return false;
+  if (byPhase !== undefined) {
+    const passedIn = state.passed?.[byPhase];
+    if (passedIn === undefined || passedIn !== (state.rounds[byPhase] ?? 1)) return false;
+  }
+  return true;
+}
+
+function lockedReason(phase: Phase): string {
+  const how = [
+    phase.approval === "before" ? "after the user approves" : "",
+    phase.unlock_after ? `once phase "${phase.unlock_after}" has passed with every reviewer approving` : "",
+  ].filter(Boolean).join(" and ");
+  return `It is allowed only in a phase that unlocks it, ${how || "after the user approves"}.`;
 }
 
 /** Whether a platform's agent name refers to the workflow's agent (plugin agents may be namespaced, e.g. "popcorn:x"). */
@@ -128,6 +145,7 @@ function outputWrite(phase: Phase, state: RunState, rel: string, agent: string |
 export function checkTool(wf: Workflow, phase: Phase, state: RunState, call: ToolCall, projectDir: string, agent?: string): string | null {
   const where = `popcorn: phase "${phase.id}" of run "${state.task}"`;
   const waiting = state.status === "awaiting_approval";
+  const waitMsg = `${where} is waiting for the user's approval. Don't act until then; ask the user to type "popcorn approve" or "popcorn reject <feedback>".`;
 
   if (call.kind === "edit") {
     const rel = projectRelative(projectDir, call.path);
@@ -139,7 +157,7 @@ export function checkTool(wf: Workflow, phase: Phase, state: RunState, call: Too
       return `${where}: ${rel} is protected by the workflow's policy.protect_paths and can't be edited by the agent.`;
     }
     if (rel.startsWith(".popcorn/")) return outputWrite(phase, state, rel, agent, where);
-    if (waiting) return `${where} is waiting for the user's approval. Don't change files; ask the user to type "popcorn approve" or "popcorn reject <feedback>".`;
+    if (waiting) return waitMsg;
     if (phase.deny?.edit?.length && glob(phase.deny.edit)(rel)) return `${where}: ${rel} matches deny.edit.`;
     const allowed = phase.allow?.edit ?? ["**"];
     if (!glob(allowed)(rel)) return `${where}: ${rel} is outside this phase's editable paths (${allowed.join(", ")}).`;
@@ -150,6 +168,8 @@ export function checkTool(wf: Workflow, phase: Phase, state: RunState, call: Too
     if (/\.popcorn\b|\bpopcorn\s+init\b/.test(call.command)) {
       return `${where}: shell commands may not touch .popcorn/ (run state, workflow, agent outputs). Read files with the Read tool; agents write their outputs with the Write tool.`;
     }
+    // An approval gate holds every action, not just edits: no shell command runs before the user decides.
+    if (waiting) return waitMsg;
     const segments = shellSegments(call.command);
     const denied = matchesAny([...(wf.policy?.deny_shell ?? []), ...(phase.deny?.shell ?? [])], segments);
     if (denied) return `${where}: "${denied}" is never allowed in this phase.`;
@@ -157,7 +177,7 @@ export function checkTool(wf: Workflow, phase: Phase, state: RunState, call: Too
     if (guarded) {
       const lockedFor = (wf.policy?.guarded_shell ?? []).find(g => shellMatch(g, guarded))!;
       const ok = (phase.allow?.guarded ?? []).includes(lockedFor) && unlocked(phase, state) && !waiting;
-      if (!ok) return `${where}: "${guarded}" is guarded. It is allowed only in a phase that unlocks it, after the user approves.`;
+      if (!ok) return `${where}: "${guarded}" is guarded. ${lockedReason(phase)}`;
     }
     if (phase.allow?.shell) {
       const outside = segments.find(s => !phase.allow!.shell!.some(p => shellMatch(p, s)));
@@ -167,6 +187,13 @@ export function checkTool(wf: Workflow, phase: Phase, state: RunState, call: Too
   }
 
   if (call.kind === "mcp") {
+    if (waiting) return waitMsg;
+    const id = `${call.server}:${call.name}`;
+    const lockedFor = (wf.policy?.guarded_mcp ?? []).find(g => shellMatch(g, id));
+    if (lockedFor) {
+      const ok = (phase.allow?.guarded ?? []).includes(lockedFor) && unlocked(phase, state) && !waiting;
+      if (!ok) return `${where}: MCP tool "${id}" is guarded. ${lockedReason(phase)}`;
+    }
     if (phase.allow?.mcp && !phase.allow.mcp.includes(call.server)) {
       return `${where}: MCP server "${call.server}" is not allowed in this phase (${phase.allow.mcp.join(", ") || "none"}).`;
     }

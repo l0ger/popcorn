@@ -19,9 +19,11 @@ export const WORKFLOW_SCHEMA = {
       properties: {
         deny_shell: stringList,
         guarded_shell: stringList,
+        guarded_mcp: stringList,
         protect_paths: stringList,
         max_attempts_per_phase: { type: "integer", minimum: 1, maximum: 7 },
         blocking_severities: stringList,
+        blocking_verdicts: stringList,
         gate_timeout_seconds: { type: "integer", minimum: 1 },
       },
     },
@@ -57,6 +59,7 @@ export const WORKFLOW_SCHEMA = {
             additionalProperties: false,
             properties: { edit: stringList, shell: stringList },
           },
+          unlock_after: { type: "string" },
           on_fail: { type: "string" },
           next: { type: "string" },
         },
@@ -101,7 +104,7 @@ function semanticProblems(wf: Workflow): string[] {
     ids.add(p.id);
   }
   for (const p of wf.phases) {
-    for (const [field, ref] of [["next", p.next], ["on_fail", p.on_fail]] as const) {
+    for (const [field, ref] of [["next", p.next], ["on_fail", p.on_fail], ["unlock_after", p.unlock_after]] as const) {
       if (ref !== undefined && !ids.has(ref)) problems.push(`phase "${p.id}": ${field} "${ref}" is not a phase`);
     }
     if (p.outputs) {
@@ -112,11 +115,16 @@ function semanticProblems(wf: Workflow): string[] {
       }
       if (p.on_fail === undefined) problems.push(`phase "${p.id}": outputs need on_fail (where to go on a blocking finding)`);
     }
+    const guarded = [...(wf.policy?.guarded_shell ?? []), ...(wf.policy?.guarded_mcp ?? [])];
     for (const g of p.allow?.guarded ?? []) {
-      if (!(wf.policy?.guarded_shell ?? []).includes(g)) problems.push(`phase "${p.id}": allow.guarded "${g}" is not in policy.guarded_shell`);
+      if (!guarded.includes(g)) problems.push(`phase "${p.id}": allow.guarded "${g}" is not in policy.guarded_shell or policy.guarded_mcp`);
     }
-    if (p.allow?.guarded?.length && p.approval !== "before") {
-      problems.push(`phase "${p.id}": allow.guarded needs approval: before (the user unlocks the commands before the phase runs)`);
+    if (p.allow?.guarded?.length && p.approval !== "before" && p.unlock_after === undefined) {
+      problems.push(`phase "${p.id}": allow.guarded needs approval: before (the user unlocks it) or unlock_after (an earlier phase's pass unlocks it)`);
+    }
+    if (p.unlock_after !== undefined && ids.has(p.unlock_after)) {
+      const at = wf.phases.findIndex(x => x.id === p.unlock_after);
+      if (at >= wf.phases.indexOf(p)) problems.push(`phase "${p.id}": unlock_after "${p.unlock_after}" must be an earlier phase`);
     }
   }
   return problems;

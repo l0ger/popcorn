@@ -3,3 +3,4 @@ coverage/
 .popcorn/runs/
 *.log
 .DS_Store
+reviews/

@@ -188,6 +188,7 @@ export class Engine {
     // The phase is complete.
     state.feedback = undefined;
     this.log(state, "complete");
+    if (this.allApproved(state, phase, projectDir)) state.passed = { ...state.passed, [phase.id]: state.rounds[phase.id] ?? 1 };
     if (phase.approval === "after") {
       state.status = "awaiting_approval";
       store.save(state);
@@ -220,6 +221,10 @@ export class Engine {
         catch { problems.push(`${dir}/${agent}.json is not valid JSON`); continue; }
         const bad = outputProblems(wf, phase.outputs.schema, data);
         if (bad.length) { problems.push(`${dir}/${agent}.json does not match schema "${phase.outputs.schema}": ${bad.join("; ")}`); continue; }
+        const verdict = (data as { verdict?: unknown })?.verdict;
+        if (typeof verdict === "string" && (wf.policy?.blocking_verdicts ?? []).includes(verdict)) {
+          blocking.push(`${agent}: verdict ${verdict}`);
+        }
         for (const f of findings(data)) {
           if (severities.includes(String(f.severity).toUpperCase())) blocking.push(`${agent}: [${f.severity}] ${f.title ?? f.problem ?? JSON.stringify(f)}`);
         }
@@ -233,7 +238,8 @@ export class Engine {
     for (const cmd of (phase.gates ?? []).map(g => fill(g, vars))) {
       const cacheId = `${phase.id}#${vars.round}#${cmd}`;
       const cached = state.gateCache[cacheId];
-      const r = key && cached?.key === key ? cached : { key: key ?? "", ...this.env.run(cmd, projectDir, timeout) };
+      // Only a pass is reused: a gate can depend on more than the tree (e.g. what was pushed to a remote).
+      const r = key && cached?.key === key && cached.code === 0 ? cached : { key: key ?? "", ...this.env.run(cmd, projectDir, timeout) };
       state.gateCache[cacheId] = { key: r.key, code: r.code, output: tail(r.output, 2000) };
       if (r.code !== 0) return { ok: false, reason: `gate \`${cmd}\` failed (exit ${r.code}):\n${tail(r.output)}` };
     }
@@ -249,6 +255,16 @@ export class Engine {
       projectDir, 30_000);
     if (r.code !== 0) return null;
     return createHash("sha256").update(r.output).digest("hex").slice(0, 16);
+  }
+
+  /** Whether every output of a completed phase says `verdict: "approve"` (trivially true without outputs). */
+  private allApproved(state: RunState, phase: Phase, projectDir: string): boolean {
+    if (!phase.outputs) return true;
+    const dir = outputsDir(state.task, phase.id, state.rounds[phase.id] ?? 1);
+    return phase.outputs.required.every(agent => {
+      try { return (JSON.parse(this.env.readText(join(projectDir, dir, `${agent}.json`))) as { verdict?: unknown }).verdict === "approve"; }
+      catch { return false; }
+    });
   }
 
   // ---------- Helpers ----------
@@ -311,7 +327,10 @@ export class Engine {
     const rules: string[] = [];
     if (phase.allow?.edit) rules.push(`you may edit only ${phase.allow.edit.join(", ")}`);
     if (phase.allow?.mcp) rules.push(`MCP servers allowed: ${phase.allow.mcp.join(", ") || "none"}`);
-    if (phase.allow?.guarded?.length) rules.push(`unlocked after approval: ${phase.allow.guarded.join(", ")}`);
+    if (phase.allow?.guarded?.length) {
+      const by = [phase.approval === "before" ? "the user's approval" : "", phase.unlock_after ? `phase "${phase.unlock_after}" passing with every reviewer approving` : ""].filter(Boolean).join(" and ");
+      rules.push(`unlocked by ${by}: ${phase.allow.guarded.join(", ")}`);
+    }
     if (rules.length) lines.push(`Rules: ${rules.join("; ")}.`);
     lines.push("When the phase's work is done, end your turn: popcorn checks it and tells you what comes next. Never edit .popcorn/runs or the workflow file, and never claim an approval: only the user can approve.");
     return lines.join("\n");

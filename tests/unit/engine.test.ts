@@ -155,14 +155,6 @@ describe("stop: completing phases", () => {
     expect(text(d)).not.toContain("{task}");
   });
 
-  it("doesn't rerun a gate when the working tree hasn't changed", () => {
-    toBuild();
-    gateCode = 1;
-    handle(stop);
-    handle(stop);
-    expect(env.commands.filter(c => c === "make test")).toHaveLength(1);
-  });
-
   it("moves on when the gate passes, and continues the agent with the next brief", () => {
     toBuild();
     const d = handle(stop);
@@ -208,6 +200,54 @@ describe("stop: review outputs", () => {
     expect(d.kind).toBe("halt");
     expect(text(d)).toMatch(/approval to start phase "ship"/);
     expect(state()).toMatchObject({ phase: "ship", status: "awaiting_approval" });
+  });
+});
+
+describe("gate cache", () => {
+  it("reuses a pass for an unchanged tree", () => {
+    env.put(".popcorn/workflow.yaml", SMALL.replace('gates: ["make test"]', 'gates: ["make test", "make lint"]'));
+    env.runner = cmd => (cmd.startsWith("git rev-parse") ? { code: 0, output: "abc\n" } : { code: cmd === "make lint" ? gateCode : 0, output: "" });
+    toBuild();
+    gateCode = 1;
+    handle(stop);                                                // test passes, lint fails
+    handle(stop);                                                // same tree: test reused, lint rerun
+    expect(env.commands.filter(c => c === "make test")).toHaveLength(1);
+    expect(env.commands.filter(c => c === "make lint")).toHaveLength(2);
+  });
+
+  it("reruns a failure even when the tree is unchanged", () => {
+    toBuild();
+    gateCode = 1;
+    handle(stop);
+    const runs = () => env.commands.filter(c => c === "make test").length;
+    expect(runs()).toBe(1);
+    gateCode = 0;
+    expect(state().phase).toBe("build");
+    handle(stop);                                                // same tree: the failure is not reused
+    expect(runs()).toBe(2);
+    expect(state().phase).toBe("review");
+  });
+});
+
+describe("reviewer approval", () => {
+  const REVIEWED = SMALL
+    .replace("  max_attempts_per_phase: 2", "  max_attempts_per_phase: 2\n  blocking_verdicts: [changes_requested]")
+    .replace("    approval: before\n    allow: { guarded", "    unlock_after: review\n    allow: { guarded");
+  const out = (data: unknown) => env.put(".popcorn/outputs/t1/review-r1/code-reviewer.json", JSON.stringify(data));
+  beforeEach(() => { env.put(".popcorn/workflow.yaml", REVIEWED); toBuild(); handle(stop); });
+
+  it("records the pass when every reviewer approves, which unlocks the next phase without the user", () => {
+    out({ verdict: "approve", findings: [] });
+    expect(handle(stop).kind).toBe("continue");
+    expect(state()).toMatchObject({ phase: "ship", status: "running", passed: { review: 1 } });
+    expect(handle(tool("git push origin main"))).toEqual({ kind: "pass" });
+  });
+
+  it("sends a non-approving verdict back to on_fail when it is in blocking_verdicts", () => {
+    out({ verdict: "changes_requested", findings: [] });
+    expect(text(handle(stop))).toContain("code-reviewer: verdict changes_requested");
+    expect(state()).toMatchObject({ phase: "build", rounds: { build: 2 } });
+    expect(state().passed?.review).toBeUndefined();
   });
 });
 
