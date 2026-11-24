@@ -36,9 +36,9 @@ AI coding agents are fast, and they cut corners when you're not watching. They "
 
 ## Quick start
 
-1. **Install the plugin** in Claude Code (replace `OWNER` with the GitHub account that hosts this repository):
+1. **Install the plugin** in Claude Code:
    ```
-   /plugin marketplace add OWNER/popcorn
+   /plugin marketplace add l0ger/popcorn
    /plugin install popcorn@popcorn
    ```
    To share it with your team, add the marketplace and the plugin to your project's `.claude/settings.json` (`extraKnownMarketplaces` and `enabledPlugins`).
