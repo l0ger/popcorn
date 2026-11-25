@@ -9,7 +9,7 @@
 # reviewer agent approves. Publish, Review and Deploy use a GitHub MCP server from your
 # project's .mcp.json (see the README), or the `gh` CLI.
 #
-# Edit it freely: add, remove or reorder phases, change gates and agents. Then run /popcorn:validate.
+# Edit it freely: add, remove or reorder phases, change gates and agents. Then run `popcorn validate`.
 # {task} is the run's name, e.g. p1-user-login.
 version: 1
 name: agile-pr

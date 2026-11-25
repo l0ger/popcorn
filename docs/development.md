@@ -26,9 +26,10 @@ npm run check      # typecheck, rebuild plugin/dist/popcorn.mjs, run all tests
 plugin/                           what Claude Code installs
   .claude-plugin/plugin.json      plugin manifest
   agents/                         the 7 generic agents (no project-specific rules)
-  skills/                         /popcorn:start, approve, reject, retry, abort, status, init, validate
+  skills/                         /popcorn:start, approve, reject, retry, abort, status, init
   hooks/hooks.json                SessionStart, UserPromptSubmit, PreToolUse and Stop → the bundle
   templates/workflow.yaml         the starter workflow
+  bin/popcorn                     CLI wrapper on the Bash tool's PATH
   dist/popcorn.mjs                the bundled engine (committed)
 src/
   core/                           platform-neutral engine

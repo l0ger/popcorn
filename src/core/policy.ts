@@ -165,8 +165,7 @@ export function checkTool(wf: Workflow, phase: Phase, state: RunState, call: Too
   }
 
   if (call.kind === "shell") {
-    // `popcorn init` also when the CLI is run by path, as the skills do: node ".../dist/popcorn.mjs" init
-    if (/\.popcorn\b|\bpopcorn(?:\.m?js)?["']?\s+init\b/.test(call.command)) {
+    if (/\.popcorn\b|\bpopcorn\s+init\b/.test(call.command)) {
       return `${where}: shell commands may not touch .popcorn/ (run state, workflow, agent outputs). Read files with the Read tool; agents write their outputs with the Write tool.`;
     }
     // An approval gate holds every action, not just edits: no shell command runs before the user decides.

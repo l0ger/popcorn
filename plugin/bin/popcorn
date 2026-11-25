@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# popcorn CLI. Claude Code puts the plugin's bin/ on the Bash tool's PATH.
+here="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")" && pwd)"
+exec node "$here/../dist/popcorn.mjs" "$@"

@@ -82,9 +82,9 @@ The limit: the main session writes each reviewer's prompt. To keep a human check
    }
    ```
 2. Before starting Claude Code, export a token that can push and write pull requests, for example `export GITHUB_PERSONAL_ACCESS_TOKEN=$(gh auth token)`. Claude Code asks you to approve the project's MCP server on first use.
-3. Protect `main` on GitHub. Popcorn's shell rules are best effort.
+3. Protect `main` on GitHub. popcorn's shell rules are best effort.
 4. Check the server's real tool names. If it names merge or write tools differently from the list above, add them to `policy.guarded_mcp`.
 
 Without an MCP server the phases' instructions fall back to the `gh` CLI.
 
-**Reviews show the token owner's name.** The server acts as whoever owns the token, so reviews appear under that account. GitHub doesn't let a pull request's author approve their own pull request, so reviews are posted with event `COMMENT`. Popcorn decides from the JSON verdicts, not from GitHub's review state.
+**Reviews show the token owner's name.** The server acts as whoever owns the token, so reviews appear under that account. GitHub doesn't let a pull request's author approve their own pull request, so reviews are posted with event `COMMENT`. popcorn decides from the JSON verdicts, not from GitHub's review state.

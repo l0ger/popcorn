@@ -1,6 +1,6 @@
-# Popcorn documentation
+# popcorn documentation
 
-Popcorn makes a coding agent follow a team's development workflow. The workflow is a YAML file of phases. Popcorn enforces it through the agent's own hooks: it refuses tool calls that break the current phase's rules, and it decides, not the model, when a phase is complete.
+popcorn makes a coding agent follow a team's development workflow. The workflow is a YAML file of phases. popcorn enforces it through the agent's own hooks: it refuses tool calls that break the current phase's rules, and it decides, not the model, when a phase is complete.
 
 The [project README](../README.md) is the user guide: install, quick start, the workflow file reference and the security model. These pages explain how popcorn works inside.
 
