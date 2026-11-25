@@ -17,5 +17,8 @@
     "tdd",
     "code-review"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "network": {
+    "hosts": []
+  }
 }

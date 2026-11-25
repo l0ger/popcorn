@@ -105,10 +105,13 @@ describe("checkTool: shell", () => {
       "rm -rf .popcorn", "mv .popcorn /tmp/x", "cd .popcorn && rm active",
       "echo '{}' > .popcorn/outputs/t1/review-r1/code-reviewer.json",
       "popcorn init --force", "npx popcorn init",
+      'node "/plugins/popcorn/dist/popcorn.mjs" init --force', "node /plugins/popcorn/dist/popcorn.mjs init",
+      "node '/plugins/popcorn/dist/popcorn.mjs' init",
     ]) expect(check("build", sh(c)), c).toMatch(/may not touch .popcorn/);
   });
   it("still allows mentioning popcorn in other ways", () => {
     expect(check("build", sh("popcorn status"))).toBeNull();
+    expect(check("build", sh('node "/plugins/popcorn/dist/popcorn.mjs" status'))).toBeNull();
     expect(check("build", sh("git commit -m 'add popcorn docs'"))).toBeNull();
   });
   it("refuses policy.deny_shell anywhere in a chain", () => {
