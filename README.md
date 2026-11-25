@@ -1,10 +1,6 @@
 <p align="center"><img src="assets/logo-256.png" width="160" alt="popcorn logo: a striped popcorn bucket with a green check mark"></p>
 
-<<<<<<< Updated upstream
-# popcorn: deterministic AI development workflow orchestrator for coding agents
-=======
-# Popcorn: deterministic AI development workflows for coding agents
->>>>>>> Stashed changes
+# Popcorn: deterministic AI development workflow orchestrator for coding agents
 
 **Popcorn makes your AI coding agent follow your team's development workflow: every phase, every quality gate, every human approval, in order.**
 
