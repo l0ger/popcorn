@@ -14,8 +14,6 @@ export interface Io {
   fs: Env;
   /** Where the bundled templates live (plugin/templates). */
   templatesDir: string;
-  /** The shell command that runs this CLI, e.g. node "/…/plugin/dist/popcorn.mjs", for the hints it prints. */
-  self: string;
 }
 export interface Result { stdout: string; stderr: string; code: number }
 
@@ -79,11 +77,11 @@ function init(io: Io, projectDir: string, force: boolean): Result {
   io.fs.writeText(target, text);
   const ignore = join(projectDir, ".popcorn", ".gitignore");
   if (!io.fs.exists(ignore)) io.fs.writeText(ignore, "# popcorn run state: keep it out of commits and review diffs\nruns/\noutputs/\nactive\n");
-  return ok(`Created ${WORKFLOW_FILE} and .popcorn/.gitignore. Edit the workflow's phases, gates and agents, then run: ${io.self} validate\n`);
+  return ok(`Created ${WORKFLOW_FILE} and .popcorn/.gitignore. Edit the workflow's phases, gates and agents, then run "popcorn validate".\n`);
 }
 
 function validate(io: Io, file: string): Result {
-  if (!io.fs.exists(file)) return err(`popcorn: ${file} not found (run: ${io.self} init)\n`);
+  if (!io.fs.exists(file)) return err(`popcorn: ${file} not found (run "popcorn init")\n`);
   try {
     const wf = parseWorkflow(io.fs.readText(file));
     return ok(`✓ ${wf.name}: ${wf.phases.length} phases (${wf.phases.map(p => p.id).join(" → ")})\n`);

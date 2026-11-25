@@ -1,6 +1,6 @@
 # Architecture
 
-Popcorn is one small Node.js program, bundled into `plugin/dist/popcorn.mjs`. The coding agent runs it on each hook event. It reads the workflow and the run's state from disk, decides, and prints the answer in the platform's format. It keeps no process running between events.
+popcorn is one small Node.js program, bundled into `plugin/dist/popcorn.mjs`. The coding agent runs it on each hook event. It reads the workflow and the run's state from disk, decides, and prints the answer in the platform's format. It keeps no process running between events.
 
 ## Architecture diagram
 
@@ -19,6 +19,7 @@ flowchart LR
         skills["skills/<br/>/popcorn:start, approve, ..."]
         agentsdir["agents/<br/>7 generic agents"]
         template["templates/workflow.yaml"]
+        bin["bin/popcorn"]
     end
 
     subgraph bundle["plugin/dist/popcorn.mjs"]
@@ -50,7 +51,7 @@ flowchart LR
     subagents -. tool calls .-> hooks
     hooks --> hooksjson
     hooksjson -- "node popcorn.mjs hook claude" --> cli
-    skills -- "node popcorn.mjs init | validate | start | status" --> cli
+    bin --> cli
     cli --> registry --> claude
     claude -- NormalizedEvent --> engine
     engine -- Decision --> claude
@@ -67,14 +68,14 @@ flowchart LR
     session -- git push --> github
 ```
 
-The dashed arrows are hook events: Claude Code calls popcorn before it acts. Popcorn never calls the agent; it only answers.
+The dashed arrows are hook events: Claude Code calls popcorn before it acts. popcorn never calls the agent; it only answers.
 
 ## Components
 
 | Component | Where | Responsibility |
 |---|---|---|
-| Plugin | `plugin/` | What Claude Code installs: the hook wiring, slash-command skills, the generic agents, the starter workflow and the committed bundle. Nothing goes on the user's `PATH`: hooks and skills run the bundle by its full path |
-| CLI | `src/cli/` | `hook <adapter>`, `init`, `validate`, `start`, `status`, run as `node plugin/dist/popcorn.mjs <command>`. Has no approve command, on purpose |
+| Plugin | `plugin/` | What Claude Code installs: the hook wiring, slash-command skills, the generic agents, the starter workflow, the CLI wrapper and the committed bundle |
+| CLI | `src/cli/` | `popcorn hook <adapter>`, `init`, `validate`, `start`, `status`. Has no approve command, on purpose |
 | Adapter registry | `src/adapters/registry.ts` | Maps a platform name to its adapter. A new platform is one new entry |
 | Claude Code adapter | `src/adapters/claude/` | Hook payload → `NormalizedEvent`; `Decision` → hook output JSON; resolves agent names (`.claude/agents/<name>.md` first, else `popcorn:<name>`); renders crashes as refusals |
 | Engine | `src/core/engine.ts` | Routes events: starts runs, applies the user's commands, checks tool calls, and on Stop checks done-conditions and moves the run on |
@@ -205,7 +206,7 @@ Only the user's prompt moves a run out of `awaiting_approval` or `escalated`. Th
 
 | Path | Written by | Purpose |
 |---|---|---|
-| `.popcorn/workflow.yaml` | The team (`/popcorn:init` copies the starter) | The workflow. Can't be edited during a run |
+| `.popcorn/workflow.yaml` | The team (`popcorn init` copies the starter) | The workflow. Can't be edited during a run |
 | `.popcorn/active` | Engine | The active run's task name, or empty |
 | `.popcorn/runs/<task>/state.json` | Engine | Phase, status, rounds, attempts, approvals, passed phases, gate cache, history. Never writable by the agent |
 | `.popcorn/outputs/<task>/<phase>-r<round>/<agent>.json` | Each required agent, for its own file only | Agent results, such as review verdicts, validated against the workflow's schema |
