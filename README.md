@@ -1,16 +1,31 @@
 <p align="center"><img src="assets/logo-256.png" width="160" alt="popcorn logo: a striped popcorn bucket with a green check mark"></p>
 
+<<<<<<< Updated upstream
 # popcorn: deterministic AI development workflow orchestrator for coding agents
+=======
+# Popcorn: deterministic AI development workflows for coding agents
+>>>>>>> Stashed changes
 
-**popcorn makes your AI coding agent follow your team's development workflow: every phase, every quality gate, every human approval, in order.** You describe the workflow once in a YAML file (for example Plan → Design → Build → Test → Publish → Review → Deploy), and popcorn enforces it through the agent's own hooks. It runs as a **Claude Code plugin** today, and **GitHub Copilot** support is on the roadmap: one workflow file, whichever agent your team uses. The agent can't skip the tests, can't merge without a code review, can't push to `main` before you approve, and can't quietly edit its own rules. It ships with ready-made agents (product manager, architect, implementer, test engineer, and code, quality and security reviewers) that you can override one by one, and it uses your project's normal MCP servers.
+**Popcorn makes your AI coding agent follow your team's development workflow: every phase, every quality gate, every human approval, in order.**
+
+You describe the workflow once in a YAML file, for example Plan → Design → Build → Test → Publish → Review → Deploy. Popcorn enforces it through the agent's own hooks, so the agent:
+
+- Can't skip the tests.
+- Can't merge without a code review.
+- Can't push straight to `main`: every change goes through a pull request.
+- Can't quietly edit its own rules.
+
+Popcorn ships with ready-made agents (product manager, architect, implementer, test engineer, and code, quality and security reviewers) that you can override one by one, and it uses your project's normal MCP servers.
+
+**Platforms:** Popcorn runs as a **Claude Code plugin** today, and **GitHub Copilot** support is on the roadmap. One workflow file, whichever agent your team uses.
 
 Spec-driven development, TDD and multi-agent code review, as a workflow you can't accidentally skip.
 
 ---
 
-## Why popcorn?
+## Why Popcorn?
 
-AI coding agents are fast, and they cut corners when you're not watching. They "finish" without running the tests, review their own work, push before anyone looked, and forget the process you explained three prompts ago. Prompts and `CLAUDE.md` rules are suggestions. popcorn turns them into **guarantees**:
+AI coding agents are fast, and they cut corners when you're not watching. They "finish" without running the tests, review their own work, push before anyone looked, and forget the process you explained three prompts ago. Prompts and `CLAUDE.md` rules are suggestions. Popcorn turns them into **guarantees**:
 
 | Without popcorn | With popcorn |
 |---|---|
@@ -26,11 +41,11 @@ AI coding agents are fast, and they cut corners when you're not watching. They "
 - **Enforced phase order.** The agent works on one phase at a time and can't move on until that phase is done.
 - **Quality gates.** Any shell command (`npm test`, `pytest`, `make lint`, `cargo clippy`) must pass before a phase is complete. Passing results are cached per working-tree state, so an unchanged tree doesn't rerun a suite that passed. Failures are always rerun, since a gate can depend on more than the tree (for example what was pushed).
 - **Human-in-the-loop approvals.** `approval: before` or `approval: after` on any phase. Only **you** can approve, by typing `popcorn approve` as a prompt. The agent has no command that approves.
-- **Guardrails.** Commands that are always denied, guarded commands and MCP tools (push, merge) that unlock only after your approval or once the reviewer agents approve, per-phase editable paths, and per-phase MCP allowlists. popcorn's own state is out of the agent's reach.
+- **Guardrails.** Commands that are always denied, guarded commands and MCP tools (push, merge) that unlock only after your approval or once the reviewer agents approve, per-phase editable paths, and per-phase MCP allowlists. Popcorn's own state is out of the agent's reach.
 - **Visible on GitHub.** The starter workflow pushes the branch and opens a pull request, posts each reviewer's findings on it as a review, and merges it once every reviewer agent approves (see [GitHub pull requests](#github-pull-requests)).
 - **Structured multi-agent review.** Reviewer agents write JSON verdicts validated against a JSON Schema in your workflow. Blocking severities loop the run back to Build, with the findings.
 - **Ready-made agents, overridable.** Seven agents ship with the plugin. Put a `.claude/agents/code-reviewer.md` in your project and popcorn uses yours instead.
-- **Your MCP servers.** popcorn reads nothing special: it uses your project's `.mcp.json`. Phases can restrict which servers are allowed.
+- **Your MCP servers.** Popcorn reads nothing special: it uses your project's `.mcp.json`. Phases can restrict which servers are allowed.
 - **Fail-safe.** No run → popcorn is invisible. Broken workflow mid-run → tool calls are refused, not silently allowed.
 - **Agent-neutral engine.** The workflow engine knows nothing about any one agent. Claude Code is supported today, GitHub Copilot is next, and other agents plug in through an adapter (see [Platforms](#platforms)).
 
@@ -48,6 +63,8 @@ AI coding agents are fast, and they cut corners when you're not watching. They "
    /popcorn:init
    ```
    This copies the starter workflow to `.popcorn/workflow.yaml` and helps you replace the placeholder `npm test` gates with your real commands. Requires Node.js 20 or later.
+
+   The workflow file always lives at `.popcorn/workflow.yaml` in the project root (the folder you open Claude Code in). Popcorn doesn't look anywhere else. `/popcorn:init` is a shortcut: you can also write that file by hand or copy one from another repository. Commit it, change it only between runs (it's locked during one), and have Claude run `popcorn validate` after each change. See [The workflow file](#the-workflow-file) for every key.
 
 3. **Start a run:**
    ```
@@ -77,7 +94,7 @@ AI coding agents are fast, and they cut corners when you're not watching. They "
  you ──"popcorn approve"──▶ approval recorded (only from your prompt)
 ```
 
-popcorn's engine is one small Node.js program bundled in the plugin. Each hook passes the event to it. The engine reads `.popcorn/workflow.yaml` and the run's state in `.popcorn/runs/<task>/state.json`, and answers allow, deny, continue or stop. The engine, not the model, decides when a phase is complete.
+Popcorn's engine is one small Node.js program bundled in the plugin. Each hook passes the event to it. The engine reads `.popcorn/workflow.yaml` and the run's state in `.popcorn/runs/<task>/state.json`, and answers allow, deny, continue or stop. The engine, not the model, decides when a phase is complete.
 
 ## The workflow file
 
@@ -187,7 +204,7 @@ Export `GITHUB_PERSONAL_ACCESS_TOKEN` before starting Claude Code, with a token 
 Read this before you rely on popcorn:
 
 - **What's enforced:** phase order, done-conditions, approvals, editable paths, MCP allowlists, and the protection of popcorn's own state and workflow file during a run. While a run waits for your approval, edits, shell commands and MCP calls are all refused.
-- **Shell rules are best effort.** popcorn splits chained commands and looks inside `bash -c '…'`, but a determined agent can disguise a command from any pattern matcher. Keep real protections (branch protection, CI, least-privilege credentials) in place. popcorn makes the right path the easy path. It doesn't replace your repository's security.
+- **Shell rules are best effort.** Popcorn splits chained commands and looks inside `bash -c '…'`, but a determined agent can disguise a command from any pattern matcher. Keep real protections (branch protection, CI, least-privilege credentials) in place. Popcorn makes the right path the easy path. It doesn't replace your repository's security.
 - **Approvals come only from your prompt.** The engine records an approval only when the user's own prompt says `popcorn approve`. No tool call can grant one.
 - **The reviewers are only as independent as their brief.** The starter workflow stops the agent from editing `.claude/agents/`, `.claude/settings*.json` and `.mcp.json` during a run, so it can't swap in a reviewer that always approves. But the main session still writes each reviewer's prompt and could steer it. If that matters to you, keep `approval: before` on Deploy.
 - **Or from the reviewers, where the workflow says so.** A phase with `unlock_after: review` unlocks its guarded commands once every reviewer filed `"verdict": "approve"`, with no prompt from you. Only the reviewer subagents can write those verdicts (see below). If you want to look before anything merges, add `approval: before` to that phase too: then both are needed.
@@ -198,7 +215,7 @@ Read this before you rely on popcorn:
 
 ## Platforms
 
-popcorn's engine (`src/core`) knows nothing about Claude Code. Each platform is an **adapter** (`src/adapters/<name>`) that translates the platform's hook payloads into popcorn's normalized events (`session_start`, `prompt`, `before_tool`, `stop`) and renders the engine's decision back.
+Popcorn's engine (`src/core`) knows nothing about Claude Code. Each platform is an **adapter** (`src/adapters/<name>`) that translates the platform's hook payloads into popcorn's normalized events (`session_start`, `prompt`, `before_tool`, `stop`) and renders the engine's decision back.
 
 | Platform | Status |
 |---|---|
@@ -240,7 +257,7 @@ tests/e2e/                        the bundled hook fed real payloads in a tempor
 
 ## FAQ
 
-**Is this a replacement for Spec Kit, BMAD or similar prompt packs?** It's complementary. Those give an agent a method. popcorn makes the method binding. You can put their prompts into popcorn's agents and phases.
+**Is this a replacement for Spec Kit, BMAD or similar prompt packs?** It's complementary. Those give an agent a method. Popcorn makes the method binding. You can put their prompts into popcorn's agents and phases.
 
 **Does it work without subagents?** Yes. A phase without `agent` is done by the main session, and the same gates and rules apply.
 
