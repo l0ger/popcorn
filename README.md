@@ -19,6 +19,21 @@ Spec-driven development, TDD and multi-agent code review, as a workflow you can'
 
 ---
 
+## Contents
+
+- [Why Popcorn?](#why-popcorn)
+- [Features](#features)
+- [Quick start](#quick-start): install, set up, start a run
+- [How it works](#how-it-works)
+- [The workflow file](#the-workflow-file): every key of `.popcorn/workflow.yaml`
+- [GitHub pull requests](#github-pull-requests)
+- [Agents](#agents): the seven built-in agents, and how to override them
+- [Security model and limits](#security-model-and-limits)
+- [Platforms](#platforms)
+- [Development](#development)
+- [FAQ](#faq)
+- [License](#license)
+
 ## Why Popcorn?
 
 AI coding agents are fast, and they cut corners when you're not watching. They "finish" without running the tests, review their own work, push before anyone looked, and forget the process you explained three prompts ago. Prompts and `CLAUDE.md` rules are suggestions. Popcorn turns them into **guarantees**:
