@@ -4,11 +4,12 @@ import { run, type Io } from "../../src/cli/run.js";
 import { MemoryEnv, PROJECT, SMALL, TEMPLATE } from "../helpers.js";
 
 const TEMPLATES = "/plugin/templates";
+const SELF = 'node "/plugin/dist/popcorn.mjs"';
 
 function io(argv: string[], opts: { stdin?: string; fs?: MemoryEnv } = {}): Io & { fs: MemoryEnv } {
   const fs = opts.fs ?? new MemoryEnv();
   if (!fs.exists(join(TEMPLATES, "workflow.yaml"))) fs.writeText(join(TEMPLATES, "workflow.yaml"), TEMPLATE);
-  return { argv, stdin: () => opts.stdin ?? "", env: { CLAUDE_PROJECT_DIR: PROJECT }, cwd: PROJECT, fs, templatesDir: TEMPLATES };
+  return { argv, stdin: () => opts.stdin ?? "", env: { CLAUDE_PROJECT_DIR: PROJECT }, cwd: PROJECT, fs, templatesDir: TEMPLATES, self: SELF };
 }
 
 describe("cli", () => {
@@ -29,7 +30,10 @@ describe("cli", () => {
 
   it("init copies the template once, and only overwrites with --force", () => {
     const i = io(["init"]);
-    expect(run(i).code).toBe(0);
+    const r = run(i);
+    expect(r.code).toBe(0);
+    // No bin/ on PATH: the hint names the bundle by path, so Claude can run it as printed.
+    expect(r.stdout).toContain(`run: ${SELF} validate`);
     expect(i.fs.get(".popcorn/workflow.yaml")).toBe(TEMPLATE);
     expect(i.fs.get(".popcorn/.gitignore")).toMatch(/runs\/\noutputs\/\nactive/);
     expect(run(io(["init"], { fs: i.fs })).code).toBe(1);
@@ -56,6 +60,7 @@ describe("cli", () => {
 
   it("validate explains a missing file", () => {
     expect(run(io(["validate"])).stderr).toMatch(/not found/);
+    expect(run(io(["validate"])).stderr).toContain(`run: ${SELF} init`);
   });
 
   it("start creates a run and status shows it", () => {

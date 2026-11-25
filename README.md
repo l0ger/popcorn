@@ -75,7 +75,7 @@ AI coding agents are fast, and they cut corners when you're not watching. They "
    ```
    This copies the starter workflow to `.popcorn/workflow.yaml` and helps you replace the placeholder `npm test` gates with your real commands. Requires Node.js 20 or later.
 
-   The workflow file always lives at `.popcorn/workflow.yaml` in the project root (the folder you open Claude Code in). Popcorn doesn't look anywhere else. `/popcorn:init` is a shortcut: you can also write that file by hand or copy one from another repository. Commit it, change it only between runs (it's locked during one), and have Claude run `popcorn validate` after each change. See [The workflow file](#the-workflow-file) for every key.
+   The workflow file always lives at `.popcorn/workflow.yaml` in the project root (the folder you open Claude Code in). Popcorn doesn't look anywhere else. `/popcorn:init` is a shortcut: you can also write that file by hand or copy one from another repository. Commit it, change it only between runs (it's locked during one), and check it with `/popcorn:validate` after each change. See [The workflow file](#the-workflow-file) for every key.
 
 3. **Start a run:**
    ```
@@ -105,7 +105,7 @@ AI coding agents are fast, and they cut corners when you're not watching. They "
  you ──"popcorn approve"──▶ approval recorded (only from your prompt)
 ```
 
-Popcorn's engine is one small Node.js program bundled in the plugin. Each hook passes the event to it. The engine reads `.popcorn/workflow.yaml` and the run's state in `.popcorn/runs/<task>/state.json`, and answers allow, deny, continue or stop. The engine, not the model, decides when a phase is complete.
+Popcorn's engine is one small Node.js program bundled in the plugin, `plugin/dist/popcorn.mjs`, built from `src/` (`npm run build`). Each hook passes the event to it, and the `init`, `validate`, `start` and `status` skills run it by its full path. It reads and writes only `.popcorn/` in your project, runs the gate commands from your workflow, and makes no network requests. The plugin puts nothing on your `PATH`. The engine reads `.popcorn/workflow.yaml` and the run's state in `.popcorn/runs/<task>/state.json`, and answers allow, deny, continue or stop. The engine, not the model, decides when a phase is complete.
 
 ## The workflow file
 
@@ -158,7 +158,7 @@ schemas:
 | `unlock_after` | An earlier phase that must have passed, in its current round, before `allow.guarded` unlocks. If that phase has `outputs`, every output must say `"verdict": "approve"`: the reviewer agents' approval stands in for yours |
 | `next` | Jump to a phase other than the next one in the list |
 
-Check your file at any time with `popcorn validate`. It reports every problem, not just the first.
+Check your file at any time with `/popcorn:validate`. It reports every problem, not just the first.
 
 ## GitHub pull requests
 
@@ -255,9 +255,8 @@ plugin/                           the Claude Code plugin
   .claude-plugin/plugin.json      manifest
   hooks/hooks.json                SessionStart, UserPromptSubmit, PreToolUse, Stop → popcorn hook claude
   agents/                         the seven default agents
-  skills/                         /popcorn:start, approve, reject, retry, abort, status, init
+  skills/                         /popcorn:start, approve, reject, retry, abort, status, init, validate
   templates/workflow.yaml         starter six-phase workflow
-  bin/popcorn                     CLI on the Bash tool's PATH
   dist/popcorn.mjs                bundled engine (generated)
 src/core/                         platform-neutral engine: workflow, policy, state, engine
 src/adapters/                     adapter interface, registry, Claude Code adapter
@@ -274,7 +273,7 @@ tests/e2e/                        the bundled hook fed real payloads in a tempor
 
 **Can a workflow branch or loop?** Yes. `on_fail` loops back, for example from Review to Build, and `next` jumps.
 
-**Where's the run state?** In `.popcorn/runs/<task>/state.json` and `.popcorn/outputs/`. `popcorn init` writes a `.popcorn/.gitignore` that keeps both out of commits; commit `.popcorn/workflow.yaml` itself.
+**Where's the run state?** In `.popcorn/runs/<task>/state.json` and `.popcorn/outputs/`. `/popcorn:init` writes a `.popcorn/.gitignore` that keeps both out of commits; commit `.popcorn/workflow.yaml` itself.
 
 ## License
 

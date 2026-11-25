@@ -7,4 +7,4 @@ disable-model-invocation: true
 popcorn start $ARGUMENTS
 
 If the context above already shows "[popcorn] Run ..." for this task, the run has started: follow that phase brief.
-Otherwise start it yourself by running `popcorn start $ARGUMENTS` with the Bash tool, then follow the brief it prints.
+Otherwise start it yourself by running `node "${CLAUDE_PLUGIN_ROOT}/dist/popcorn.mjs" start $ARGUMENTS` with the Bash tool, then follow the brief it prints.
