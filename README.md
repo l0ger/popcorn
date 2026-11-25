@@ -1,6 +1,6 @@
 <p align="center"><img src="assets/logo-256.png" width="160" alt="popcorn logo: a striped popcorn bucket with a green check mark"></p>
 
-# popcorn: deterministic AI development workflows for coding agents
+# popcorn: deterministic AI development workflow orchestrator for coding agents
 
 **popcorn makes your AI coding agent follow your team's development workflow: every phase, every quality gate, every human approval, in order.** You describe the workflow once in a YAML file (for example Plan → Design → Build → Test → Publish → Review → Deploy), and popcorn enforces it through the agent's own hooks. It runs as a **Claude Code plugin** today, and **GitHub Copilot** support is on the roadmap: one workflow file, whichever agent your team uses. The agent can't skip the tests, can't merge without a code review, can't push to `main` before you approve, and can't quietly edit its own rules. It ships with ready-made agents (product manager, architect, implementer, test engineer, and code, quality and security reviewers) that you can override one by one, and it uses your project's normal MCP servers.
 
