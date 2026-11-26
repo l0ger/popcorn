@@ -2,7 +2,7 @@
 
 # Popcorn: deterministic AI development workflows for coding agents
 
-**Popcorn makes your AI coding agent follow your team's development workflow: every phase, every quality gate, every human approval, in order.**
+**Your coding agent can't skip a step.**
 
 You describe the workflow once in a YAML file, for example Plan → Design → Build → Test → Publish → Review → Deploy. Popcorn enforces it through the agent's own hooks, so the agent:
 
